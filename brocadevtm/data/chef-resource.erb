@@ -1,0 +1,46 @@
+require_relative 'vtmrest'
+
+class Chef
+  class Resource::Vtm_<%= @type_ %> < Resource::VtmRest
+
+    identity_attr :name
+    provides :vtm_<%= @type_ %>
+    self.resource_name = :vtm_<%= @type_ %>
+    actions :create, :destroy
+    default_action :create
+    
+    attribute :name, kind_of: String, name_attribute: true
+	 attribute :internal, kind_of: String, default: "<%= @type_ %>"
+    attribute :path, kind_of: String, default: "<%= @uri %>"
+
+    <% @required.each do |k,h| %>
+    attribute :<%= k %>, kind_of: <%= h[:class] %>, required: true
+    <% end %>
+
+    <% @params.each do |k,v| %>
+    attribute :<%= k %>, kind_of: <%= (v.is_a?(TrueClass) or v.is_a?(FalseClass)) ? "[TrueClass, FalseClass]" : (v.is_a?(Array))? "[Array, String]" : v.class %>, default: <%= (v.is_a?(String)) ? "'#{v.gsub(/"/,'\"')}'" : v %>
+    <% end %>
+
+  end
+end
+
+class Chef
+  class Provider::Vtm_<%= @type_ %> < Provider::VtmRest
+    def load_current_resource
+      @current_resource ||= Resource::Vtm_<%= @type_ %>.new(new_resource.name)
+      super
+
+      @configHash = {}
+      <% @params.each do |k,v| %>
+      @configHash[:<%= k %>] = new_resource.<%= k %>
+      <% end %>
+
+    end
+  end
+end
+
+Chef::Platform.set(
+        resource: :vtm_<%= @type_ %>,
+        provider: Chef::Provider::Vtm_<%= @type_ %>,
+)
+
