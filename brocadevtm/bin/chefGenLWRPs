@@ -18,7 +18,7 @@ class GetOptions
 
 		opt_parser = OptionParser.new do |opts|
 
-			opts.banner = "Usage: genManifests [options]"
+			opts.banner = "Usage: chefGenLWRPs [options]"
 
 			opts.separator ""
 			opts.separator "Specific options:"
@@ -123,12 +123,12 @@ $stdin.iflush
 gets()
 vtmrc.dumpConfig(:manifests, "#{homedir}/libraries", "#{homedir}/templates/default/", "#{homedir}/files", false)
 puts("")
-#puts("===============================================================")
-#puts(" Press <RETURN> to dump Objects...")
+puts("===============================================================")
+puts(" Press <RETURN> to dump Objects...")
 $stdin.iflush
-#gets()
-#vtmrc.dumpConfig(:objects, "#{homedir}/libraries", "#{homedir}/templates", "#{homedir}/files", false)
-#puts("")
+gets()
+vtmrc.dumpConfig(:objects, "#{homedir}/recipes", "#{homedir}/templates/default/", "#{homedir}/files", false)
+puts("")
 puts("===============================================================")
 puts("    Press <RETURN> to clean up.")
 $stdin.iflush

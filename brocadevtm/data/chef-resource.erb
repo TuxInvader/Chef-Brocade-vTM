@@ -10,7 +10,7 @@ class Chef
     default_action :create
     
     attribute :name, kind_of: String, name_attribute: true
-	 attribute :internal, kind_of: String, default: "<%= @type_ %>"
+    attribute :internal, kind_of: String, default: "<%= @type_ %>"
     attribute :path, kind_of: String, default: "<%= @uri %>"
 
     <% @required.each do |k,h| %>

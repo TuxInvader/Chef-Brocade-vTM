@@ -15,7 +15,6 @@ class Chef
 		default_action :create
 
 		attribute :name, kind_of: String, name_attribute: true
-		attribute :type, kind_of: String, default: 'application/json'
 		attribute :internal, kind_of: String, default: 'vtm_rest'
 
 	end
@@ -28,13 +27,29 @@ class Chef
   			true
 		end
 
+		def initialize(new_resource, run_context)
+			super(new_resource, run_context)
+			endpoint = "https://#{node['brocadevtm']['rest_host']}:#{node['brocadevtm']['rest_port']}#{new_resource.path}"
+			@vtmrc = BrocadeREST::VTMController.new(node['brocadevtm']['rest_user'], \
+							node['brocadevtm']['rest_pass'], endpoint, nil,\
+			 				node['brocadevtm']['debug'] )
+
+            if new_resource.to_hash.has_key?(:content)
+                @content = new_resource.content
+                @type = "application/octet-stream"
+            else
+                @type = "application/json"
+            end
+
+		end
+
 		def action_create 
 			if resource_matches?
 				Chef::Log.info "#{@current_resource} already exists on vTM - nothing to do."
 			else
 				converge_by("Create vTM Resource #{@new_resource}:") do
-					$response = vtmrc.objectCreate(@current_resource.name, @content, \
-						@current_resource.type, @current_resource.internal)
+					$response = @vtmrc.objectCreate(@current_resource.name, @content, \
+						@type, @current_resource.internal)
 					if $response.nil?
 						Chef::Log.warn "#{@current_resource} creation failed! Nil response"
 						raise "Failed to create resource"
@@ -54,7 +69,6 @@ class Chef
 			end
 		end
 		
-
 		def process_template
 			dirPath = ::File.dirname(__FILE__)
 			input = ::File.read( "#{dirPath}/../templates/default/#{@new_resource.internal}.erb" )
@@ -63,12 +77,21 @@ class Chef
 			@content = eruby.result( @configHash )
 		end
 
+        def process_content
+            dirPath = ::File.dirname(__FILE__)
+            localFile = "#{dirPath}/../files/#{@content}"
+            if ::File.exists?(localFile)
+                @content = IO.read(localFile)
+            end
+        end
+
 		def resource_matches?
 			if @content.nil?
 				process_template
+            else
+				process_content
 			end
-			$response = vtmrc.objectCompare(@current_resource.name, @content, \
-			@current_resource.type, @current_resource.internal)
+			$response = @vtmrc.objectCompare(@current_resource.name, @content, @type, @current_resource.internal)
 			if $response.nil?
 				Chef::Log.warn "#{ @current_resource } check failed. Unkown Error"
 				raise "Failed to determine current state"
@@ -81,12 +104,6 @@ class Chef
 			return false
 		end
 		
-		def vtmrc
-			endpoint = "https://#{node['brocadevtm']['rest_host']}:#{node['brocadevtm']['rest_port']}#{@current_resource.path}"
-			@vtmrc = BrocadeREST::VTMController.new(node['brocadevtm']['rest_user'], \
-							node['brocadevtm']['rest_pass'], endpoint, nil,\
-			 				node['brocadevtm']['debug'] )
-		end
 	end
 end
 

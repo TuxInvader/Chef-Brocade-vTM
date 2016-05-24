@@ -18,10 +18,6 @@ module BrocadeREST
 		# Generate the manifest. 
 		def genManifest(outputDir,isClass=false)
 
-			if isClass or @isBinary
-				return
-			end
-
 			# If we have documentation available in the skel/docs folder then read it.
 			# Else if we have a parent type, refer to that manifest.
 			docfile = "__FILE__/../skel/docs/#{@type_}.doc"
@@ -34,7 +30,7 @@ module BrocadeREST
 				end
 			elsif (@template != nil)
 				parent = @template.chomp(".erb")
-				documentation = "#\n# This class is a direct implementation of brocadvtm::#{parent}\n"
+				documentation = "#\n# This class is a direct implementation of brocadvtm, Vtm_#{parent}\n"
 				documentation += "#\n# Please refer to the documentation in that module for more information\n"
 				documentation += "#\n"
 			else
@@ -44,26 +40,53 @@ module BrocadeREST
 			# build the parameters hash from the raw JSON
 			decodeJSON()
 
+            # In Chef we create recipes for classes and libraries for everything else
+            # We must create libraries for classes without parents.
+            if isClass and parent.nil? and (!@isBinary)
+                isClass = false
+                outputDir = outputDir[0..-8] + "libraries"
+            end
+
 			# Built in objects should be classes, while types should get defines.
-			# There is only one Ping monitor, but theyre are lots of monitors
+			# There is only one Ping monitor, but there are lots of monitors
 			code = ""
 			if isClass
-				desc = "# === Class: Vtm_#{@type_}\n"
-				#@maxKeyLength >= 6 ? sp = " " * ( @maxKeyLength - 6 ) : sp = " "
-				#code += "  \$ensure#{sp} = present,\n"
+				desc = "# === Recipe: Vtm_#{@type_}\n"
 			else
-				desc = "# === Define: Vtm_#{@type_}\n"
-				#code = "define brocadevtm::#{@type_} (\n"
-				#code += "  \$ensure,\n"
+				desc = "# === library: Vtm_#{@type_}\n"
 			end
 
-			# content and ensure are the only params for binaries.
+			# set content for binaries.
 			if @isBinary 
 				if isClass 
-					code += "  \$content = file('brocadevtm/#{@type_}.data'),\n){\n"
+                    @params["content"] = "#{@type_}.data" 
 				else
-					code += "  \$content,\n){\n"
+                    @params["content"] = "" 
 				end
+            end
+
+            if isClass
+                
+                if parent.nil?
+                    parent, slash, name = @type.rpartition('/')
+                    parent = parent.gsub(/[\/\.-]|%20/, "_").downcase                    
+                else
+                    skip = parent.length + 1
+                    name = @type[skip..-1]
+                end
+                code += "vtm_#{parent} '#{name}' do\n"
+                code += "\taction = :create\n"
+
+                @params.each do |key,value|
+                     value = inspectValue(value)
+                     if value == "undef"
+                        next
+                     end
+                     code += "\t#{key} #{value}\n"
+                 end
+
+                code += "end\n" 
+            
 			else
 
 				dirPath = File.dirname(__FILE__)
@@ -80,6 +103,7 @@ module BrocadeREST
 			manifest.puts documentation
 			manifest.puts code
 			manifest.close
+
 		end
 
 
@@ -335,6 +359,10 @@ module BrocadeREST
 						end
 					elsif extension == ".pp"
 						if IO.read(test,7) == "# === D"
+							parentFile=test
+						end
+					elsif extension == ".rb"
+						if IO.read(test,7) == "# === L"
 							parentFile=test
 						end
 					end
